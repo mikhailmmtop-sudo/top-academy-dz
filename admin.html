@@ -28,17 +28,14 @@
   </style>
 </head>
 <body>
-
 <div class="container">
   <h1>Админ: Записи на ДЗ</h1>
-
   <!-- Вход -->
   <div id="login-form" class="login">
     <input type="password" id="password" placeholder="Пароль" />
     <button onclick="login()">Войти</button>
     <p id="error" style="color:#e74c3c; margin-top:10px; display:none;">Неверный пароль</p>
   </div>
-
   <!-- Контент -->
   <div id="content" class="hidden">
     <div class="stats">
@@ -46,9 +43,7 @@
       <div class="stat-card"><h3>Ближайший ПН</h3><p id="next">—</p></div>
       <div class="stat-card"><h3>Мест осталось</h3><p id="left">—</p></div>
     </div>
-
     <div id="records"></div>
-
     <div class="actions">
       <button onclick="resetAll()">Сбросить все записи</button>
     </div>
@@ -86,8 +81,10 @@
       const list = records[date];
       total += list.length;
       const dateStr = new Date(date).toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
+      
+      // ИСПРАВЛЕНО: используем двойные кавычки внутри одинарных
       const freeBtn = list.length > 0 ? 
-        `<button class="free-btn" onclick="freePlace('${date}')">Освободить 1 место</button>` : '';
+        `<button class="free-btn" onclick="freePlace(&quot;${date}&quot;)">Освободить 1 место</button>` : '';
       
       html += `
         <div class="date-group">
@@ -118,7 +115,7 @@
     if (!confirm("Освободить 1 место на " + new Date(date).toLocaleDateString('ru-RU') + "?")) return;
     const records = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
     if (records[date] && records[date].length > 0) {
-      records[date].pop();
+      records[date].pop(); // Удаляем последнюю запись
       if (records[date].length === 0) delete records[date];
       localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
       alert("Место освобождено!");
@@ -138,6 +135,5 @@
     if (e.key === 'Enter') login();
   });
 </script>
-
 </body>
 </html>
