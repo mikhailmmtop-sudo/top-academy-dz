@@ -100,7 +100,7 @@
   }
 
   function updatePlaces() {
-    const key = getNextTuesdayKey(); // "11.11"
+    const key = getNextTuesdayKey();
     const count = records.filter(r => r["Дата"] === key).length;
     const left = MAX_PLACES - count;
 
@@ -110,15 +110,6 @@
     placesEl.style.color = left > 0 ? '#2e7d32' : '#c62828';
 
     document.getElementById('submit-btn').disabled = left === 0;
-  }
-
-  async function sendToTelegram(data) {
-    const text = `НОВАЯ ЗАПИСЬ\n\nДата: ${data.date}\nСтудент: ${data.student}\nРодитель: ${data.parent}\nГруппа: ${data.group || "—"}\nТелефон: ${data.phone}\n\nОсталось: ${MAX_PLACES - records.filter(r => r["Дата"] === getNextTuesdayKey()).length - 1}`;
-    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text })
-    });
   }
 
   document.getElementById('signup-form').addEventListener('submit', async function(e) {
@@ -155,7 +146,14 @@
       body: JSON.stringify({ date: displayDate, student, parent, group, phone })
     });
 
-    await sendToTelegram({ date: displayDate, student, parent, group, phone });
+    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: TELEGRAM_CHAT_ID,
+        text: `НОВАЯ ЗАПИСЬ\n\nДата: ${displayDate}\nСтудент: ${student}\nРодитель: ${parent}\nГруппа: ${group || "—"}\nТелефон: ${phone}\n\nОсталось: ${MAX_PLACES - records.filter(r => r["Дата"] === key).length - 1}`
+      })
+    });
 
     document.getElementById('success-msg').innerHTML = `Вы записаны на <strong>${displayDate}</strong> в 18:00!`;
     document.getElementById('success-msg').classList.add('show');
