@@ -21,12 +21,20 @@
     table { width: 100%; border-collapse: collapse; margin-top: 10px; }
     th, td { padding: 12px; border-bottom: 1px solid #eee; text-align: left; }
     th { background: #f8f9fa; }
-    tr { cursor: pointer; transition: background 0.2s; }
-    tr:hover { background: #f0f8ff; }
-    tr.delete-mode { background: #ffebee !important; }
     .actions { margin-top: 30px; text-align: center; }
     .actions button { margin: 0 10px; }
     .free-btn { background: #e74c3c; padding: 6px 10px; font-size: 0.8em; }
+    .delete-btn {
+      background: #e74c3c;
+      color: white;
+      border: none;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.8em;
+      cursor: pointer;
+      float: right;
+    }
+    .delete-btn:hover { background: #c62828; }
     .hidden { display: none; }
   </style>
 </head>
@@ -91,17 +99,17 @@
         <div class="date-group">
           <h3>${dateStr} — ${list.length}/20 мест ${freeBtn}</h3>
           <table>
-            <thead><tr><th>№</th><th>Студент</th><th>Родитель</th><th>Группа</th><th>Телефон</th><th>Время</th></tr></thead>
+            <thead><tr><th>№</th><th>Студент</th><th>Родитель</th><th>Группа</th><th>Телефон</th><th>Время</th><th></th></tr></thead>
             <tbody>`;
       list.forEach((r, i) => {
-        const index = i;
-        html += `<tr onclick="deleteRecord(&quot;${date}&quot;, ${index})">
+        html += `<tr>
           <td>${i+1}</td>
           <td>${r.student}</td>
           <td>${r.parent}</td>
           <td>${r.group || '—'}</td>
           <td>${r.phone}</td>
           <td>${new Date(r.timestamp).toLocaleTimeString('ru-RU')}</td>
+          <td><button class="delete-btn" onclick="deleteRecord(&quot;${date}&quot;, ${i})" title="Удалить запись">Удалить</button></td>
         </tr>`;
       });
       html += `</tbody></table></div>`;
@@ -118,7 +126,7 @@
     const record = records[date][index];
     if (!record) return;
 
-    if (confirm(`Удалить запись:\n${record.student}\n(${record.parent}, ${record.phone})`)) {
+    if (confirm(`Удалить запись?\n\nСтудент: ${record.student}\nРодитель: ${record.parent}\nТелефон: ${record.phone}`)) {
       records[date].splice(index, 1);
       if (records[date].length === 0) delete records[date];
       localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
