@@ -16,7 +16,7 @@
     input:required { border-left: 4px solid #3498db; }
     .required::after { content: " *"; color: #e74c3c; }
     .places { text-align: center; padding: 14px; background: #e8f5e9; border-radius: 8px; font-weight: bold; color: #2e7d32; margin: 20px 0; font-size: 1.1em; }
-    button { width: 100%; padding: 14px; background: #27aae1; color: white; border: none; border,border-radius: 8px; font-size: 1.2em; font-weight: bold; cursor: pointer; }
+    button { width: 100%; padding: 14px; background: #27aae1; color: white; border: none; border-radius: 8px; font-size: 1.2em; font-weight: bold; cursor: pointer; }
     button:hover { background: #1e93c7; }
     button:disabled { background: #ccc; cursor: not-allowed; }
     button.loading { background: #95a5a6; }
@@ -60,10 +60,7 @@
 </div>
 
 <script>
-  // ТВОЙ URL ИЗ APPS SCRIPT
   const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxdkS8qxjx2EcZayyE2WDTPlZskq6qYBu0ScDTlI_EVjnqRV9UMewkUm8R0diAuFop5/exec";
-  
-  // TELEGRAM
   const TELEGRAM_BOT_TOKEN = "8404039163:AAGA_K8aCVYjswNRFScuNCB25AF_3cRYD-4";
   const TELEGRAM_CHAT_ID = "-5066133405";
 
@@ -88,17 +85,18 @@
   async function loadRecords() {
     try {
       const response = await fetch(GOOGLE_SCRIPT_URL + "?t=" + Date.now());
-      records = await response.json();
+      const data = await response.json();
+      records = data; // Теперь точно с заглавными буквами
       updatePlaces();
     } catch (e) {
-      document.getElementById('places').textContent = "Нет связи с сервером";
+      document.getElementById('places').textContent = "Нет связи";
     }
   }
 
   function updatePlaces() {
     const nextTuesday = getNextTuesday();
     const dateStr = formatDate(nextTuesday);
-    const count = records.filter(r => r.Дата === dateStr).length;
+    const count = records.filter(r => r["Дата"] === dateStr).length;
     const left = MAX_PLACES - count;
 
     const placesEl = document.getElementById('places');
@@ -119,7 +117,7 @@
 Группа: ${data.group || "—"}
 Телефон: ${data.phone}
 
-Осталось мест: ${MAX_PLACES - records.filter(r => r.Дата === data.date).length - 1}
+Осталось мест: ${MAX_PLACES - records.filter(r => r["Дата"] === data.date).length - 1}
     `.trim();
 
     await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
@@ -151,7 +149,7 @@
       return;
     }
 
-    const currentCount = records.filter(r => r.Дата === dateStr).length;
+    const currentCount = records.filter(r => r["Дата"] === dateStr).length;
     if (currentCount >= MAX_PLACES) {
       alert('Места закончились!');
       btn.textContent = "Записаться";
@@ -159,20 +157,14 @@
       return;
     }
 
-    // Отправляем в Google Таблицу
-    try {
-      await fetch(GOOGLE_SCRIPT_URL, {
-        method: 'POST',
-        body: JSON.stringify({ date: dateStr, student, parent, group, phone })
-      });
-    } catch (e) {
-      console.error("Ошибка отправки в Google:", e);
-    }
+    // Отправляем
+    await fetch(GOOGLE_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ date: dateStr, student, parent, group, phone })
+    });
 
-    // Telegram
     await sendToTelegram({ date: dateStr, student, parent, group, phone });
 
-    // Успех
     document.getElementById('success-msg').innerHTML = `
       Вы успешно записались!<br>
       Ждём вас <strong>${dateStr}</strong> в 18:00.
@@ -181,15 +173,13 @@
     document.getElementById('signup-form').style.display = 'none';
     document.querySelector('.places').style.display = 'none';
 
-    // Обновляем
     await loadRecords();
     isSubmitting = false;
   });
 
-  // Запуск
   (async () => {
     await loadRecords();
-    setInterval(loadRecords, 10000); // Каждые 10 сек
+    setInterval(loadRecords, 10000);
   })();
 </script>
 
