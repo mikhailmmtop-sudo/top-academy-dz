@@ -59,7 +59,6 @@
 </div>
 
 <script>
-  // НОВАЯ ССЫЛКА
   const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxwZIC6QLmTDHvr2CBcBGj1Z1s8bUhpBTsDDJImvt1VZSMH7ITgbSFUF7F0GJxm5yt6/exec";
   const TELEGRAM_BOT_TOKEN = "8404039163:AAGA_K8aCVYjswNRFScuNCB25AF_3cRYD-4";
   const TELEGRAM_CHAT_ID = "-5066133405";
@@ -68,18 +67,24 @@
   let isSubmitting = false;
   let records = [];
 
-  function getNextTuesday() {
+  function getNextTuesdayKey() {
     const today = new Date();
     const day = today.getDay();
     const diff = (2 + 7 - day) % 7 || 7;
     const next = new Date(today);
     next.setDate(today.getDate() + diff);
-    next.setHours(0, 0, 0, 0);
-    return next;
+    const dd = String(next.getDate()).padStart(2, '0');
+    const mm = String(next.getMonth() + 1).padStart(2, '0');
+    return `${dd}.${mm}`;
   }
 
   function formatDisplayDate() {
-    return getNextTuesday().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })
+    const today = new Date();
+    const day = today.getDay();
+    const diff = (2 + 7 - day) % 7 || 7;
+    const next = new Date(today);
+    next.setDate(today.getDate() + diff);
+    return next.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })
       .replace('вторник', 'Вторник');
   }
 
@@ -95,20 +100,15 @@
   }
 
   function updatePlaces() {
-    const targetDate = getNextTuesday();
-    const count = records.filter(r => {
-      const cellDate = r["Дата"];
-      if (!cellDate) return false;
-      const d = new Date(cellDate);
-      d.setHours(0, 0, 0, 0);
-      return d.getTime() === targetDate.getTime();
-    }).length;
-
+    const key = getNextTuesdayKey(); // "11.11"
+    const count = records.filter(r => r["Дата"] === key).length;
     const left = MAX_PLACES - count;
+
     const placesEl = document.getElementById('places');
     placesEl.textContent = left > 0 ? `Осталось ${left} мест` : "Мест нет";
     placesEl.style.background = left > 0 ? '#e8f5e9' : '#ffebee';
     placesEl.style.color = left > 0 ? '#2e7d32' : '#c62828';
+
     document.getElementById('submit-btn').disabled = left === 0;
   }
 
@@ -121,6 +121,7 @@
     btn.textContent = "Отправка...";
 
     const displayDate = formatDisplayDate();
+    const key = getNextTuesdayKey();
     const student = document.getElementById('student').value.trim();
     const parent = document.getElementById('parent').value.trim();
     const group = document.getElementById('group').value.trim();
@@ -133,14 +134,7 @@
       return;
     }
 
-    const currentCount = records.filter(r => {
-      const cellDate = r["Дата"];
-      if (!cellDate) return false;
-      const d = new Date(cellDate);
-      d.setHours(0, 0, 0, 0);
-      return d.getTime() === getNextTuesday().getTime();
-    }).length;
-
+    const currentCount = records.filter(r => r["Дата"] === key).length;
     if (currentCount >= MAX_PLACES) {
       alert('Места закончились!');
       btn.textContent = "Записаться";
@@ -148,8 +142,10 @@
       return;
     }
 
+    // Отправляем как text/plain
     await fetch(GOOGLE_SCRIPT_URL, {
       method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify({ date: displayDate, student, parent, group, phone })
     });
 
