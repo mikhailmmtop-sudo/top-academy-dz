@@ -22,6 +22,7 @@
     button.loading { background: #95a5a6; }
     .success { display: none; text-align: center; padding: 25px; background: #d4edda; color: #155724; border: 1px solid #c3e6cb; border-radius: 8px; margin-top: 20px; font-size: 1.1em; }
     .success.show { display: block; animation: fadeIn 0.5s; }
+    .debug { text-align: center; color: #e74c3c; font-size: 0.9em; margin: 10px 0; }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   </style>
 </head>
@@ -35,6 +36,7 @@
   </p>
 
   <div class="places" id="places">Загрузка...</div>
+  <div class="debug" id="debug"></div>
 
   <form id="signup-form">
     <div class="form-group">
@@ -74,6 +76,7 @@
     const diff = (2 + 7 - day) % 7 || 7;
     const next = new Date(today);
     next.setDate(today.getDate() + diff);
+    next.setHours(0, 0, 0, 0);
     return next;
   }
 
@@ -83,23 +86,42 @@
   }
 
   async function loadRecords() {
+    const debugEl = document.getElementById('debug');
+    debugEl.textContent = "Загружаем данные...";
+
     try {
-      const response = await fetch(GOOGLE_SCRIPT_URL + "?t=" + Date.now());
+      const url = GOOGLE_SCRIPT_URL + "?t=" + Date.now();
+      const response = await fetch(url);
+      
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
       const data = await response.json();
-      records = data; // Теперь точно с заглавными буквами
+      if (!Array.isArray(data)) throw new Error("Данные не массив");
+
+      records = data;
+      debugEl.textContent = `Загружено записей: ${records.length}`;
       updatePlaces();
-    } catch (e) {
-      document.getElementById('places').textContent = "Нет связи";
+
+    } catch (error) {
+      console.error("Ошибка загрузки:", error);
+      document.getElementById('places').textContent = "Ошибка загрузки";
+      debugEl.textContent = `Ошибка: ${error.message}`;
     }
   }
 
   function updatePlaces() {
     const nextTuesday = getNextTuesday();
     const dateStr = formatDate(nextTuesday);
-    const count = records.filter(r => r["Дата"] === dateStr).length;
-    const left = MAX_PLACES - count;
 
+    // Ищем точное совпадение даты
+    const count = records.filter(r => {
+      const recordDate = r["Дата"];
+      return recordDate && recordDate.includes(dateStr.split(' ')[1] + ' ' + dateStr.split(' ')[2]);
+    }).length;
+
+    const left = MAX_PLACES - count;
     const placesEl = document.getElementById('places');
+
     placesEl.textContent = left > 0 ? `Осталось ${left} мест` : "Мест нет";
     placesEl.style.background = left > 0 ? '#e8f5e9' : '#ffebee';
     placesEl.style.color = left > 0 ? '#2e7d32' : '#c62828';
@@ -117,20 +139,25 @@
 Группа: ${data.group || "—"}
 Телефон: ${data.phone}
 
-Осталось мест: ${MAX_PLACES - records.filter(r => r["Дата"] === data.date).length - 1}
+Осталось мест: ${MAX_PLACES - records.filter(r => r["Дата"] && r["Дата"].includes(data.date.split(' ')[1] + ' ' + data.date.split(' ')[2])).length - 1}
     `.trim();
 
-    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text, parse_mode: 'HTML' })
-    });
+    try {
+      await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text, parse_mode: 'HTML' })
+      });
+    } catch (e) {
+      console.error("Telegram ошибка:", e);
+    }
   }
 
   document.getElementById('signup-form').addEventListener('submit', async function(e) {
     e.preventDefault();
     if (isSubmitting) return;
     isSubmitting = true;
+
     const btn = document.getElementById('submit-btn');
     btn.textContent = "Отправка...";
     btn.disabled = true;
@@ -149,7 +176,7 @@
       return;
     }
 
-    const currentCount = records.filter(r => r["Дата"] === dateStr).length;
+    const currentCount = records.filter(r => r["Дата"] && r["Дата"].includes(dateStr.split(' ')[1] + ' ' + dateStr.split(' ')[2])).length;
     if (currentCount >= MAX_PLACES) {
       alert('Места закончились!');
       btn.textContent = "Записаться";
@@ -158,10 +185,14 @@
     }
 
     // Отправляем
-    await fetch(GOOGLE_SCRIPT_URL, {
-      method: 'POST',
-      body: JSON.stringify({ date: dateStr, student, parent, group, phone })
-    });
+    try {
+      await fetch(GOOGLE_SCRIPT_URL, {
+        method: 'POST',
+        body: JSON.stringify({ date: dateStr, student, parent, group, phone })
+      });
+    } catch (e) {
+      console.error("Ошибка отправки:", e);
+    }
 
     await sendToTelegram({ date: dateStr, student, parent, group, phone });
 
@@ -173,13 +204,15 @@
     document.getElementById('signup-form').style.display = 'none';
     document.querySelector('.places').style.display = 'none';
 
+    // Перезагружаем данные
     await loadRecords();
     isSubmitting = false;
   });
 
+  // Запуск
   (async () => {
     await loadRecords();
-    setInterval(loadRecords, 10000);
+    setInterval(loadRecords, 8000); // Каждые 8 сек
   })();
 </script>
 
