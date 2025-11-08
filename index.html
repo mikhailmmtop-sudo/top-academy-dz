@@ -100,7 +100,7 @@
   }
 
   function updatePlaces() {
-    const key = getNextTuesdayKey(); // "11.11"
+    const key = getNextTuesdayKey();
     const count = records.filter(r => r["Дата"] === key).length;
     const left = MAX_PLACES - count;
 
@@ -142,11 +142,14 @@
       return;
     }
 
-    // Отправляем как text/plain
+    // ОТПРАВЛЯЕМ КАК FORM-DATA
+    const formData = new URLSearchParams();
+    formData.append('data', JSON.stringify({ date: displayDate, student, parent, group, phone }));
+
     await fetch(GOOGLE_SCRIPT_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ date: displayDate, student, parent, group, phone })
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: formData
     });
 
     await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
