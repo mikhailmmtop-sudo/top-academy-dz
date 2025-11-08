@@ -21,7 +21,6 @@
     th, td { padding: 12px; border-bottom: 1px solid #eee; text-align: left; }
     th { background: #f8f9fa; }
     .hidden { display: none; }
-    .debug { background: #fff3cd; padding: 10px; border-radius: 6px; margin: 10px 0; font-size: 0.9em; }
   </style>
 </head>
 <body>
@@ -41,21 +40,14 @@
       <div class="stat-card"><h3>Мест осталось</h3><p id="left">—</p></div>
     </div>
     <button onclick="loadData()">Обновить</button>
-    <div class="debug" id="debug">Проверка...</div>
     <div id="records">Загрузка...</div>
   </div>
 </div>
 
 <script>
   const PASSWORD = "0000";
-  const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxdkS8qxjx2EcZayyE2WDTPlZskq6qYBu0ScDTlI_EVjnqRV9UMewkUm8R0diAuFop5/exec";
-
-  // Убираем пробелы из ключей
-  function getValue(row, key) {
-    const keys = Object.keys(row);
-    const found = keys.find(k => k.trim() === key);
-    return found ? (row[found] || '—') : '—';
-  }
+  // НОВАЯ ССЫЛКА
+  const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxwZIC6QLmTDHvr2CBcBGj1Z1s8bUhpBTsDDJImvt1VZSMH7ITgbSFUF7F0GJxm5yt6/exec";
 
   function login() {
     if (document.getElementById('password').value === PASSWORD) {
@@ -69,24 +61,18 @@
 
   async function loadData() {
     const recordsEl = document.getElementById('records');
-    const debugEl = document.getElementById('debug');
     recordsEl.innerHTML = "Загрузка...";
-    debugEl.textContent = "Загружаем...";
 
     try {
       const response = await fetch(GOOGLE_SCRIPT_URL + "?t=" + Date.now());
       if (!response.ok) throw new Error("Нет ответа");
-      
       const records = await response.json();
-      if (!Array.isArray(records)) throw new Error("Не массив");
-
-      debugEl.innerHTML = `Записей: ${records.length}<br>Ключи: ${Object.keys(records[0] || {}).map(k => `'${k}'`).join(', ')}`;
 
       const grouped = {};
       records.forEach(r => {
-        const date = getValue(r, "Дата");
-        if (!grouped[date]) grouped[date] = [];
-        grouped[date].push(r);
+        const dateStr = r["Дата"] ? new Date(r["Дата"]).toLocaleDateString('ru-RU') : "Без даты";
+        if (!grouped[dateStr]) grouped[dateStr] = [];
+        grouped[dateStr].push(r);
       });
 
       let total = 0;
@@ -106,11 +92,11 @@
         list.forEach((r, i) => {
           html += `<tr>
             <td>${i+1}</td>
-            <td>${getValue(r, "Студент")}</td>
-            <td>${getValue(r, "Родитель")}</td>
-            <td>${getValue(r, "Группа")}</td>
-            <td>${getValue(r, "Телефон")}</td>
-            <td>${getValue(r, "Время записи")}</td>
+            <td>${r["Студент"] || '—'}</td>
+            <td>${r["Родитель"] || '—'}</td>
+            <td>${r["Группа"] || '—'}</td>
+            <td>${r["Телефон"] || '—'}</td>
+            <td>${r["Время записи"] ? new Date(r["Время записи"]).toLocaleString('ru-RU') : '—'}</td>
           </tr>`;
         });
         html += `</tbody></table></div>`;
@@ -122,9 +108,7 @@
       recordsEl.innerHTML = html || '<p style="text-align:center; color:#777;">Записей нет</p>';
 
     } catch (error) {
-      console.error(error);
       recordsEl.innerHTML = `<p style="color:#e74c3c;">Ошибка: ${error.message}</p>`;
-      debugEl.textContent = `Ошибка: ${error.message}`;
     }
   }
 </script>
