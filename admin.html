@@ -21,21 +21,19 @@
     th, td { padding: 12px; border-bottom: 1px solid #eee; text-align: left; }
     th { background: #f8f9fa; }
     .hidden { display: none; }
-    .error { color: #e74c3c; text-align: center; margin: 20px 0; }
+    .debug { background: #fff3cd; padding: 10px; border-radius: 6px; margin: 10px 0; font-size: 0.9em; }
   </style>
 </head>
 <body>
 <div class="container">
   <h1>Админ: Записи на ДЗ</h1>
   
-  <!-- Логин -->
   <div id="login-form" class="login">
     <input type="password" id="password" placeholder="Пароль" />
     <button onclick="login()">Войти</button>
-    <p id="error" class="error" style="display:none;">Неверный пароль</p>
+    <p id="error" style="color:#e74c3c; margin-top:10px; display:none;">Неверный пароль</p>
   </div>
 
-  <!-- Контент -->
   <div id="content" class="hidden">
     <div class="stats">
       <div class="stat-card"><h3>Всего</h3><p id="total">0</p></div>
@@ -43,6 +41,7 @@
       <div class="stat-card"><h3>Мест осталось</h3><p id="left">—</p></div>
     </div>
     <button onclick="loadData()">Обновить</button>
+    <div class="debug" id="debug">Проверка...</div>
     <div id="records">Загрузка...</div>
   </div>
 </div>
@@ -51,9 +50,15 @@
   const PASSWORD = "0000";
   const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxdkS8qxjx2EcZayyE2WDTPlZskq6qYBu0ScDTlI_EVjnqRV9UMewkUm8R0diAuFop5/exec";
 
+  // Убираем пробелы из ключей
+  function getValue(row, key) {
+    const keys = Object.keys(row);
+    const found = keys.find(k => k.trim() === key);
+    return found ? (row[found] || '—') : '—';
+  }
+
   function login() {
-    const input = document.getElementById('password').value;
-    if (input === PASSWORD) {
+    if (document.getElementById('password').value === PASSWORD) {
       document.getElementById('login-form').classList.add('hidden');
       document.getElementById('content').classList.remove('hidden');
       loadData();
@@ -64,18 +69,22 @@
 
   async function loadData() {
     const recordsEl = document.getElementById('records');
+    const debugEl = document.getElementById('debug');
     recordsEl.innerHTML = "Загрузка...";
+    debugEl.textContent = "Загружаем...";
 
     try {
       const response = await fetch(GOOGLE_SCRIPT_URL + "?t=" + Date.now());
-      if (!response.ok) throw new Error("Сервер не отвечает");
+      if (!response.ok) throw new Error("Нет ответа");
       
       const records = await response.json();
-      if (!Array.isArray(records)) throw new Error("Неверный формат данных");
+      if (!Array.isArray(records)) throw new Error("Не массив");
+
+      debugEl.innerHTML = `Записей: ${records.length}<br>Ключи: ${Object.keys(records[0] || {}).map(k => `'${k}'`).join(', ')}`;
 
       const grouped = {};
       records.forEach(r => {
-        const date = r["Дата"] || "Без даты";
+        const date = getValue(r, "Дата");
         if (!grouped[date]) grouped[date] = [];
         grouped[date].push(r);
       });
@@ -97,11 +106,11 @@
         list.forEach((r, i) => {
           html += `<tr>
             <td>${i+1}</td>
-            <td>${r["Студент"] || '—'}</td>
-            <td>${r["Родитель"] || '—'}</td>
-            <td>${r["Группа"] || '—'}</td>
-            <td>${r["Телефон"] || '—'}</td>
-            <td>${r["Время записи"] || '—'}</td>
+            <td>${getValue(r, "Студент")}</td>
+            <td>${getValue(r, "Родитель")}</td>
+            <td>${getValue(r, "Группа")}</td>
+            <td>${getValue(r, "Телефон")}</td>
+            <td>${getValue(r, "Время записи")}</td>
           </tr>`;
         });
         html += `</tbody></table></div>`;
@@ -113,15 +122,11 @@
       recordsEl.innerHTML = html || '<p style="text-align:center; color:#777;">Записей нет</p>';
 
     } catch (error) {
-      console.error("Ошибка:", error);
-      recordsEl.innerHTML = `<p class="error">Ошибка загрузки: ${error.message}</p>`;
+      console.error(error);
+      recordsEl.innerHTML = `<p style="color:#e74c3c;">Ошибка: ${error.message}</p>`;
+      debugEl.textContent = `Ошибка: ${error.message}`;
     }
   }
-
-  // Вход по Enter
-  document.getElementById('password').addEventListener('keypress', e => {
-    if (e.key === 'Enter') login();
-  });
 </script>
 </body>
 </html>
