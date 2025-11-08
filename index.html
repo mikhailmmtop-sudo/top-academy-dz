@@ -40,11 +40,11 @@
 <div class="container">
   <h1>Запись на выполнение домашних заданий</h1>
   <p class="subtitle">
-    Бесплатное занятие для выполнения домашних заданий.<br>
-    Понедельник с 18:00 до 19:20.<br>
+    Дополнительное занятие для выполнения домашних заданий.<br>
+    <strong>Вторник с 18:00 до 19:20.</strong><br>
     На занятии можно работать над проектами, задавать вопросы преподавателю и получать помощь.<br>
     <strong>Максимальное количество мест — 20.</strong><br>
-    Запись доступна только на ближайший понедельник.
+    Запись доступна только на ближайший вторник.
   </p>
 
   <div class="dates" id="dates-container"></div>
@@ -76,8 +76,8 @@
 
 <script>
   // === ВСТАВЬ СВОЙ TELEGRAM BOT TOKEN И CHAT ID ===
-  const TELEGRAM_BOT_TOKEN = "8404039163:AAGA_K8aCVYjswNRFScuNCB25AF_3cRYD-4"; // ← Твой бот
-  const TELEGRAM_CHAT_ID = "-5066133405";     // ← Группа/канал
+  const TELEGRAM_BOT_TOKEN = "777777777:AAF..."; // ← Твой бот
+  const TELEGRAM_CHAT_ID = "-1001234567890";     // ← Группа
 
   const MAX_PLACES = 20;
   const STORAGE_KEY = "dz_records";
@@ -85,10 +85,10 @@
 
   let records = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
 
-  // Сброс каждое воскресенье 23:59
+  // Сброс каждое ВОСКРЕСЕНЬЕ в 23:59
   function checkWeeklyReset() {
     const now = new Date();
-    const day = now.getDay();
+    const day = now.getDay(); // 0 = ВС, 1 = ПН, ..., 2 = ВТ
     const hour = now.getHours();
     const lastReset = localStorage.getItem(RESET_KEY);
 
@@ -103,30 +103,30 @@
     }
   }
 
-  function getNextMondays() {
-    const mondays = [];
+  function getNextTuesdays() {
+    const tuesdays = [];
     const today = new Date();
     const day = today.getDay();
     for (let i = 1; i <= 3; i++) {
       const next = new Date(today);
-      next.setDate(today.getDate() + ((1 + 7 - day) % 7 || 7) + (i - 1) * 7);
+      next.setDate(today.getDate() + ((2 + 7 - day) % 7 || 7) + (i - 1) * 7);
       next.setHours(18, 0, 0, 0);
-      mondays.push(next);
+      tuesdays.push(next);
     }
-    return mondays;
+    return tuesdays;
   }
 
   function formatDate(date) {
     return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', weekday: 'long' })
-      .replace('понедельник', 'Понедельник');
+      .replace('вторник', 'Вторник');
   }
 
   function init() {
     checkWeeklyReset();
     const container = document.getElementById('dates-container');
-    const mondays = getNextMondays();
+    const tuesdays = getNextTuesdays();
 
-    mondays.forEach((date, i) => {
+    tuesdays.forEach((date, i) => {
       const dateStr = date.toISOString().split('T')[0];
       const occupied = (records[dateStr] || []).length;
       const label = document.createElement('label');
@@ -238,6 +238,4 @@
 </script>
 
 </body>
-
 </html>
-
