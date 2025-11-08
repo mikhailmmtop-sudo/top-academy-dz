@@ -20,8 +20,6 @@
     input[type="text"], input[type="tel"] { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 1em; }
     input:required { border-left: 4px solid #3498db; }
     .required::after { content: " *"; color: #e74c3c; }
-    .error { color: #e74c3c; font-size: 0.9em; margin-top: 5px; display: none; }
-    .error.show { display: block; }
 
     .places { text-align: center; padding: 14px; background: #e8f5e9; border-radius: 8px; font-weight: bold; color: #2e7d32; margin: 20px 0; font-size: 1.1em; }
 
@@ -40,7 +38,7 @@
 <div class="container">
   <h1>Запись на выполнение домашних заданий</h1>
   <p class="subtitle">
-    Бесплатное занятие для выполнения домашних заданий.<br>
+    Дополнительное занятие для выполнения домашних заданий.<br>
     <strong>Вторник с 18:00 до 19:20.</strong><br>
     На занятии можно работать над проектами, задавать вопросы преподавателю и получать помощь.<br>
     <strong>Максимальное количество мест — 20.</strong><br>
@@ -54,7 +52,6 @@
     <div class="form-group">
       <label for="student" class="required">Фамилия Имя студента</label>
       <input type="text" id="student" required />
-      <div class="error" id="duplicate-error">Этот студент уже записан на эту дату</div>
     </div>
     <div class="form-group">
       <label for="parent" class="required">Фамилия Имя родителя</label>
@@ -88,7 +85,7 @@
   // Сброс каждое ВОСКРЕСЕНЬЕ в 23:59
   function checkWeeklyReset() {
     const now = new Date();
-    const day = now.getDay(); // 0 = ВС, 1 = ПН, ..., 2 = ВТ
+    const day = now.getDay();
     const hour = now.getHours();
     const lastReset = localStorage.getItem(RESET_KEY);
 
@@ -157,25 +154,8 @@
     document.getElementById('submit-btn').disabled = left === 0;
   }
 
-  function checkDuplicate() {
-    const student = document.getElementById('student').value.trim().toLowerCase();
-    const selected = document.querySelector('input[name="date"]:checked');
-    if (!student || !selected) return;
-
-    const dateStr = selected.value;
-    const exists = (records[dateStr] || []).some(r => r.student.toLowerCase() === student);
-    const errorEl = document.getElementById('duplicate-error');
-    if (exists) {
-      errorEl.classList.add('show');
-      document.getElementById('submit-btn').disabled = true;
-    } else {
-      errorEl.classList.remove('show');
-    }
-  }
-
   function setupListeners() {
-    document.querySelectorAll('input[name="date"]').forEach(r => r.addEventListener('change', () => { updatePlaces(); checkDuplicate(); }));
-    document.getElementById('student').addEventListener('input', () => setTimeout(checkDuplicate, 300));
+    document.querySelectorAll('input[name="date"]').forEach(r => r.addEventListener('change', updatePlaces));
   }
 
   // Отправка в Telegram
@@ -214,14 +194,13 @@
 
     const dateRecords = records[date] || [];
     if (dateRecords.length >= MAX_PLACES) return alert('Места закончились!');
-    if (dateRecords.some(r => r.student.toLowerCase() === student.toLowerCase())) return alert('Этот студент уже записан!');
 
-    // Сохраняем
+    // Сохраняем — БЕЗ ПРОВЕРКИ ДУБЛЕЙ
     dateRecords.push({ student, parent, group, phone, timestamp: new Date().toISOString() });
     records[date] = dateRecords;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
 
-    // Отправляем в Telegram
+    // Отправ178ляем в Telegram
     await sendToTelegram({ date, formattedDate, student, parent, group, phone });
 
     // Успех
@@ -239,4 +218,3 @@
 
 </body>
 </html>
-
