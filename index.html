@@ -36,7 +36,7 @@
   </p>
 
   <div class="places" id="places">Загрузка...</div>
-  <div class="debug" id="debug"></div>
+  <div class="debug" id="debug">Проверка...</div>
 
   <form id="signup-form">
     <div class="form-group">
@@ -70,53 +70,59 @@
   let isSubmitting = false;
   let records = [];
 
-  function getNextTuesday() {
+  // Получаем ближайший вторник в формате ДД.ММ
+  function getNextTuesdayKey() {
     const today = new Date();
     const day = today.getDay();
     const diff = (2 + 7 - day) % 7 || 7;
     const next = new Date(today);
     next.setDate(today.getDate() + diff);
-    next.setHours(0, 0, 0, 0);
-    return next;
+    const dd = String(next.getDate()).padStart(2, '0');
+    const mm = String(next.getMonth() + 1).padStart(2, '0');
+    return `${dd}.${mm}`;
   }
 
-  function formatDate(date) {
-    return date.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })
+  // Форматируем дату для отображения
+  function formatDisplayDate() {
+    const today = new Date();
+    const day = today.getDay();
+    const diff = (2 + 7 - day) % 7 || 7;
+    const next = new Date(today);
+    next.setDate(today.getDate() + diff);
+    return next.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })
       .replace('вторник', 'Вторник');
   }
 
   async function loadRecords() {
     const debugEl = document.getElementById('debug');
-    debugEl.textContent = "Загружаем данные...";
+    debugEl.textContent = "Загрузка данных...";
 
     try {
       const url = GOOGLE_SCRIPT_URL + "?t=" + Date.now();
       const response = await fetch(url);
-      
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
+      
       const data = await response.json();
-      if (!Array.isArray(data)) throw new Error("Данные не массив");
+      if (!Array.isArray(data)) throw new Error("Не массив");
 
       records = data;
-      debugEl.textContent = `Загружено записей: ${records.length}`;
+      debugEl.textContent = `Записей: ${records.length} | Ключ: ${getNextTuesdayKey()}`;
       updatePlaces();
 
     } catch (error) {
-      console.error("Ошибка загрузки:", error);
-      document.getElementById('places').textContent = "Ошибка загрузки";
+      console.error("Ошибка:", error);
+      document.getElementById('places').textContent = "Ошибка";
       debugEl.textContent = `Ошибка: ${error.message}`;
     }
   }
 
   function updatePlaces() {
-    const nextTuesday = getNextTuesday();
-    const dateStr = formatDate(nextTuesday);
-
-    // Ищем точное совпадение даты
+    const key = getNextTuesdayKey(); // например "12.11"
+    
     const count = records.filter(r => {
-      const recordDate = r["Дата"];
-      return recordDate && recordDate.includes(dateStr.split(' ')[1] + ' ' + dateStr.split(' ')[2]);
+      const cell = r["Дата"] || "";
+      // Ищем "12.11" в "Вторник, 12 ноября" или "12.11.2025"
+      return cell.includes(key);
     }).length;
 
     const left = MAX_PLACES - count;
@@ -139,7 +145,7 @@
 Группа: ${data.group || "—"}
 Телефон: ${data.phone}
 
-Осталось мест: ${MAX_PLACES - records.filter(r => r["Дата"] && r["Дата"].includes(data.date.split(' ')[1] + ' ' + data.date.split(' ')[2])).length - 1}
+Осталось мест: ${MAX_PLACES - records.filter(r => (r["Дата"] || "").includes(getNextTuesdayKey())).length - 1}
     `.trim();
 
     try {
@@ -148,9 +154,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text, parse_mode: 'HTML' })
       });
-    } catch (e) {
-      console.error("Telegram ошибка:", e);
-    }
+    } catch (e) {}
   }
 
   document.getElementById('signup-form').addEventListener('submit', async function(e) {
@@ -162,8 +166,8 @@
     btn.textContent = "Отправка...";
     btn.disabled = true;
 
-    const nextTuesday = getNextTuesday();
-    const dateStr = formatDate(nextTuesday);
+    const displayDate = formatDisplayDate();
+    const key = getNextTuesdayKey();
     const student = document.getElementById('student').value.trim();
     const parent = document.getElementById('parent').value.trim();
     const group = document.getElementById('group').value.trim();
@@ -176,7 +180,7 @@
       return;
     }
 
-    const currentCount = records.filter(r => r["Дата"] && r["Дата"].includes(dateStr.split(' ')[1] + ' ' + dateStr.split(' ')[2])).length;
+    const currentCount = records.filter(r => (r["Дата"] || "").includes(key)).length;
     if (currentCount >= MAX_PLACES) {
       alert('Места закончились!');
       btn.textContent = "Записаться";
@@ -184,27 +188,22 @@
       return;
     }
 
-    // Отправляем
-    try {
-      await fetch(GOOGLE_SCRIPT_URL, {
-        method: 'POST',
-        body: JSON.stringify({ date: dateStr, student, parent, group, phone })
-      });
-    } catch (e) {
-      console.error("Ошибка отправки:", e);
-    }
+    // Отправляем в таблицу
+    await fetch(GOOGLE_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ date: displayDate, student, parent, group, phone })
+    });
 
-    await sendToTelegram({ date: dateStr, student, parent, group, phone });
+    await sendToTelegram({ date: displayDate, student, parent, group, phone });
 
     document.getElementById('success-msg').innerHTML = `
       Вы успешно записались!<br>
-      Ждём вас <strong>${dateStr}</strong> в 18:00.
+      Ждём вас <strong>${displayDate}</strong> в 18:00.
     `;
     document.getElementById('success-msg').classList.add('show');
     document.getElementById('signup-form').style.display = 'none';
     document.querySelector('.places').style.display = 'none';
 
-    // Перезагружаем данные
     await loadRecords();
     isSubmitting = false;
   });
@@ -212,7 +211,7 @@
   // Запуск
   (async () => {
     await loadRecords();
-    setInterval(loadRecords, 8000); // Каждые 8 сек
+    setInterval(loadRecords, 7000);
   })();
 </script>
 
