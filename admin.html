@@ -21,6 +21,9 @@
     table { width: 100%; border-collapse: collapse; margin-top: 10px; }
     th, td { padding: 12px; border-bottom: 1px solid #eee; text-align: left; }
     th { background: #f8f9fa; }
+    tr { cursor: pointer; transition: background 0.2s; }
+    tr:hover { background: #f0f8ff; }
+    tr.delete-mode { background: #ffebee !important; }
     .actions { margin-top: 30px; text-align: center; }
     .actions button { margin: 0 10px; }
     .free-btn { background: #e74c3c; padding: 6px 10px; font-size: 0.8em; }
@@ -81,8 +84,6 @@
       const list = records[date];
       total += list.length;
       const dateStr = new Date(date).toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
-      
-      // ИСПРАВЛЕНО: используем двойные кавычки внутри одинарных
       const freeBtn = list.length > 0 ? 
         `<button class="free-btn" onclick="freePlace(&quot;${date}&quot;)">Освободить 1 место</button>` : '';
       
@@ -93,7 +94,8 @@
             <thead><tr><th>№</th><th>Студент</th><th>Родитель</th><th>Группа</th><th>Телефон</th><th>Время</th></tr></thead>
             <tbody>`;
       list.forEach((r, i) => {
-        html += `<tr>
+        const index = i;
+        html += `<tr onclick="deleteRecord(&quot;${date}&quot;, ${index})">
           <td>${i+1}</td>
           <td>${r.student}</td>
           <td>${r.parent}</td>
@@ -111,11 +113,25 @@
     document.getElementById('records').innerHTML = html || '<p>Записей нет</p>';
   }
 
+  function deleteRecord(date, index) {
+    const records = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+    const record = records[date][index];
+    if (!record) return;
+
+    if (confirm(`Удалить запись:\n${record.student}\n(${record.parent}, ${record.phone})`)) {
+      records[date].splice(index, 1);
+      if (records[date].length === 0) delete records[date];
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+      alert("Запись удалена!");
+      loadData();
+    }
+  }
+
   function freePlace(date) {
     if (!confirm("Освободить 1 место на " + new Date(date).toLocaleDateString('ru-RU') + "?")) return;
     const records = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
     if (records[date] && records[date].length > 0) {
-      records[date].pop(); // Удаляем последнюю запись
+      records[date].pop();
       if (records[date].length === 0) delete records[date];
       localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
       alert("Место освобождено!");
