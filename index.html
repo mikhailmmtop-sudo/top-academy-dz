@@ -10,29 +10,18 @@
     .container { max-width: 700px; margin: 40px auto; padding: 30px; background: white; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
     h1 { text-align: center; color: #2c3e50; font-size: 2.2em; margin-bottom: 10px; }
     .subtitle { text-align: center; color: #555; margin-bottom: 30px; font-size: 1.1em; }
-    .dates { display: flex; flex-direction: column; gap: 12px; margin: 25px 0; }
-    label { display: flex; align-items: center; padding: 12px 16px; background: #eef5ff; border-radius: 8px; cursor: pointer; font-weight: 500; }
-    label:hover { background: #d0e7ff; }
-    input[type="radio"] { margin-right: 12px; transform: scale(1.2); }
-
     .form-group { margin-bottom: 18px; }
     label[for] { display: block; margin-bottom: 6px; font-weight: 600; color: #2c3e50; }
     input[type="text"], input[type="tel"] { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 1em; }
     input:required { border-left: 4px solid #3498db; }
     .required::after { content: " *"; color: #e74c3c; }
-
     .places { text-align: center; padding: 14px; background: #e8f5e9; border-radius: 8px; font-weight: bold; color: #2e7d32; margin: 20px 0; font-size: 1.1em; }
-
-    button { width: 100%; padding: 14px; background: #27aae1; color: white; border: none; border-radius: 8px; font-size: 1.2em; font-weight: bold; cursor: pointer; }
+    button { width: 100%; padding: 14px; background: #27aae1; color: white; border: none; border,border-radius: 8px; font-size: 1.2em; font-weight: bold; cursor: pointer; }
     button:hover { background: #1e93c7; }
     button:disabled { background: #ccc; cursor: not-allowed; }
     button.loading { background: #95a5a6; }
-
     .success { display: none; text-align: center; padding: 25px; background: #d4edda; color: #155724; border: 1px solid #c3e6cb; border-radius: 8px; margin-top: 20px; font-size: 1.1em; }
     .success.show { display: block; animation: fadeIn 0.5s; }
-
-    .test-btn { background: #f39c12; margin-top: 10px; padding: 10px; font-size: 1em; }
-
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   </style>
 </head>
@@ -41,15 +30,11 @@
 <div class="container">
   <h1>Запись на выполнение домашних заданий</h1>
   <p class="subtitle">
-    Дополнительное занятие для выполнения домашних заданий.<br>
     <strong>Вторник с 18:00 до 19:20.</strong><br>
-    На занятии можно работать над проектами, задавать вопросы преподавателю и получать помощь.<br>
-    <strong>Максимальное количество мест — 20.</strong><br>
-    Запись доступна только на ближайший вторник.
+    Максимум 20 мест. Запись только на ближайший вторник.
   </p>
 
-  <div class="dates" id="dates-container"></div>
-  <div class="places" id="places">Выберите дату</div>
+  <div class="places" id="places">Загрузка...</div>
 
   <form id="signup-form">
     <div class="form-group">
@@ -65,91 +50,56 @@
       <input type="text" id="group" />
     </div>
     <div class="form-group">
-      <label for="phone" class="required">Контактный телефон родителя</label>
+      <label for="phone" class="required">Телефон родителя</label>
       <input type="tel" id="phone" required />
     </div>
     <button type="submit" id="submit-btn">Записаться</button>
-    <button type="button" class="test-btn" onclick="testTelegram()">Тест Telegram</button>
   </form>
 
   <div class="success" id="success-msg"></div>
 </div>
 
 <script>
-  // ТВОЙ ТОКЕН И CHAT_ID (уже вставлены!)
+  // ТВОЙ URL ИЗ APPS SCRIPT
+  const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxdkS8qxjx2EcZayyE2WDTPlZskq6qYBu0ScDTlI_EVjnqRV9UMewkUm8R0diAuFop5/exec";
+  
+  // TELEGRAM
   const TELEGRAM_BOT_TOKEN = "8404039163:AAGA_K8aCVYjswNRFScuNCB25AF_3cRYD-4";
   const TELEGRAM_CHAT_ID = "-5066133405";
 
   const MAX_PLACES = 20;
-  const STORAGE_KEY = "dz_records";
-  const RESET_KEY = "dz_last_reset";
-
-  let records = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
   let isSubmitting = false;
+  let records = [];
 
-  function checkWeeklyReset() {
-    const now = new Date();
-    const day = now.getDay();
-    const hour = now.getHours();
-    const lastReset = localStorage.getItem(RESET_KEY);
-
-    if (day === 0 && hour >= 23 && (!lastReset || new Date(lastReset) < now.setHours(0,0,0,0))) {
-      const weekAgo = new Date();
-      weekAgo.setDate(weekAgo.getDate() - 7);
-      Object.keys(records).forEach(date => {
-        if (new Date(date) < weekAgo) delete records[date];
-      });
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
-      localStorage.setItem(RESET_KEY, new Date().toISOString());
-      console.log("Авто-сброс мест выполнен!");
-    }
-  }
-
-  function getNextTuesdays() {
-    const tuesdays = [];
+  function getNextTuesday() {
     const today = new Date();
     const day = today.getDay();
-    for (let i = 1; i <= 3; i++) {
-      const next = new Date(today);
-      next.setDate(today.getDate() + ((2 + 7 - day) % 7 || 7) + (i - 1) * 7);
-      next.setHours(18, 0, 0, 0);
-      tuesdays.push(next);
-    }
-    return tuesdays;
+    const diff = (2 + 7 - day) % 7 || 7;
+    const next = new Date(today);
+    next.setDate(today.getDate() + diff);
+    return next;
   }
 
   function formatDate(date) {
-    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', weekday: 'long' })
+    return date.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })
       .replace('вторник', 'Вторник');
   }
 
-  function init() {
-    checkWeeklyReset();
-    const container = document.getElementById('dates-container');
-    const tuesdays = getNextTuesdays();
-
-    tuesdays.forEach((date, i) => {
-      const dateStr = date.toISOString().split('T')[0];
-      const occupied = (records[dateStr] || []).length;
-      const label = document.createElement('label');
-      label.innerHTML = `
-        <input type="radio" name="date" value="${dateStr}" ${i === 0 ? 'checked' : ''} ${i !== 0 ? 'disabled' : ''}>
-        ${formatDate(date)} 18:00–19:20
-        ${i !== 0 ? ' <span style="color:#999;">(только ближайший)</span>' : ''}
-        ${occupied >= MAX_PLACES ? ' <span style="color:#e74c3c;">(мест нет)</span>' : ''}
-      `;
-      container.appendChild(label);
-    });
-    updatePlaces();
-    setupListeners();
+  async function loadRecords() {
+    try {
+      const response = await fetch(GOOGLE_SCRIPT_URL + "?t=" + Date.now());
+      records = await response.json();
+      updatePlaces();
+    } catch (e) {
+      document.getElementById('places').textContent = "Нет связи с сервером";
+    }
   }
 
   function updatePlaces() {
-    const selected = document.querySelector('input[name="date"]:checked');
-    if (!selected) return;
-    const dateStr = selected.value;
-    const occupied = (records[dateStr] || []).length;
-    const left = MAX_PLACES - occupied;
+    const nextTuesday = getNextTuesday();
+    const dateStr = formatDate(nextTuesday);
+    const count = records.filter(r => r.Дата === dateStr).length;
+    const left = MAX_PLACES - count;
 
     const placesEl = document.getElementById('places');
     placesEl.textContent = left > 0 ? `Осталось ${left} мест` : "Мест нет";
@@ -159,72 +109,36 @@
     document.getElementById('submit-btn').disabled = left === 0;
   }
 
-  function setupListeners() {
-    document.querySelectorAll('input[name="date"]').forEach(r => r.addEventListener('change', updatePlaces));
-  }
-
-  // ТЕСТ TELEGRAM
-  async function testTelegram() {
-    const testText = "ТЕСТ: Бот работает!";
-    const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: testText })
-      });
-      const data = await response.json();
-      if (data.ok) {
-        alert("ТЕСТ УСПЕШЕН! Сообщение отправлено в группу.");
-      } else {
-        alert("ОШИБКА: " + JSON.stringify(data));
-        console.error(data);
-      }
-    } catch (error) {
-      alert("Нет интернета или ошибка: " + error.message);
-    }
-  }
-
-  // Отправка записи
   async function sendToTelegram(data) {
     const text = `
 НОВАЯ ЗАПИСЬ НА ДЗ
 
-Дата: ${data.formattedDate}
+Дата: ${data.date}
 Студент: ${data.student}
 Родитель: ${data.parent}
 Группа: ${data.group || "—"}
 Телефон: ${data.phone}
 
-Осталось мест: ${MAX_PLACES - (records[data.date]?.length || 0) - 1}
+Осталось мест: ${MAX_PLACES - records.filter(r => r.Дата === data.date).length - 1}
     `.trim();
 
-    const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text, parse_mode: 'HTML' })
-      });
-      const result = await response.json();
-      console.log("Telegram:", result);
-    } catch (error) {
-      console.error("Ошибка отправки:", error);
-    }
+    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text, parse_mode: 'HTML' })
+    });
   }
 
   document.getElementById('signup-form').addEventListener('submit', async function(e) {
     e.preventDefault();
-
     if (isSubmitting) return;
     isSubmitting = true;
-    const submitBtn = document.getElementById('submit-btn');
-    submitBtn.textContent = "Отправка...";
-    submitBtn.classList.add('loading');
-    submitBtn.disabled = true;
+    const btn = document.getElementById('submit-btn');
+    btn.textContent = "Отправка...";
+    btn.disabled = true;
 
-    const date = document.querySelector('input[name="date"]:checked').value;
-    const formattedDate = formatDate(new Date(date));
+    const nextTuesday = getNextTuesday();
+    const dateStr = formatDate(nextTuesday);
     const student = document.getElementById('student').value.trim();
     const parent = document.getElementById('parent').value.trim();
     const group = document.getElementById('group').value.trim();
@@ -232,46 +146,51 @@
 
     if (!student || !parent || !phone) {
       alert('Заполните обязательные поля!');
-      resetSubmit();
+      btn.textContent = "Записаться";
+      isSubmitting = false;
       return;
     }
 
-    const dateRecords = records[date] || [];
-    if (dateRecords.length >= MAX_PLACES) {
+    const currentCount = records.filter(r => r.Дата === dateStr).length;
+    if (currentCount >= MAX_PLACES) {
       alert('Места закончились!');
-      resetSubmit();
+      btn.textContent = "Записаться";
+      isSubmitting = false;
       return;
     }
 
-    // Сохраняем
-    dateRecords.push({ student, parent, group, phone, timestamp: new Date().toISOString() });
-    records[date] = dateRecords;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+    // Отправляем в Google Таблицу
+    try {
+      await fetch(GOOGLE_SCRIPT_URL, {
+        method: 'POST',
+        body: JSON.stringify({ date: dateStr, student, parent, group, phone })
+      });
+    } catch (e) {
+      console.error("Ошибка отправки в Google:", e);
+    }
 
-    // Отправляем
-    await sendToTelegram({ date, formattedDate, student, parent, group, phone });
+    // Telegram
+    await sendToTelegram({ date: dateStr, student, parent, group, phone });
 
     // Успех
     document.getElementById('success-msg').innerHTML = `
       Вы успешно записались!<br>
-      Ждём вас <strong>${formattedDate}</strong> в 18:00.
+      Ждём вас <strong>${dateStr}</strong> в 18:00.
     `;
     document.getElementById('success-msg').classList.add('show');
     document.getElementById('signup-form').style.display = 'none';
     document.querySelector('.places').style.display = 'none';
 
-    setTimeout(() => { isSubmitting = false; }, 5000);
+    // Обновляем
+    await loadRecords();
+    isSubmitting = false;
   });
 
-  function resetSubmit() {
-    isSubmitting = false;
-    const btn = document.getElementById('submit-btn');
-    btn.textContent = "Записаться";
-    btn.classList.remove('loading');
-    btn.disabled = false;
-  }
-
-  init();
+  // Запуск
+  (async () => {
+    await loadRecords();
+    setInterval(loadRecords, 10000); // Каждые 10 сек
+  })();
 </script>
 
 </body>
