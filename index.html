@@ -19,10 +19,8 @@
     button { width: 100%; padding: 14px; background: #27aae1; color: white; border: none; border-radius: 8px; font-size: 1.2em; font-weight: bold; cursor: pointer; }
     button:hover { background: #1e93c7; }
     button:disabled { background: #ccc; cursor: not-allowed; }
-    button.loading { background: #95a5a6; }
     .success { display: none; text-align: center; padding: 25px; background: #d4edda; color: #155724; border: 1px solid #c3e6cb; border-radius: 8px; margin-top: 20px; font-size: 1.1em; }
     .success.show { display: block; animation: fadeIn 0.5s; }
-    .debug { text-align: center; color: #e74c3c; font-size: 0.9em; margin: 10px 0; }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   </style>
 </head>
@@ -36,7 +34,6 @@
   </p>
 
   <div class="places" id="places">Загрузка...</div>
-  <div class="debug" id="debug">Проверка...</div>
 
   <form id="signup-form">
     <div class="form-group">
@@ -70,7 +67,6 @@
   let isSubmitting = false;
   let records = [];
 
-  // Получаем ближайший вторник в формате ДД.ММ
   function getNextTuesdayKey() {
     const today = new Date();
     const day = today.getDay();
@@ -82,7 +78,6 @@
     return `${dd}.${mm}`;
   }
 
-  // Форматируем дату для отображения
   function formatDisplayDate() {
     const today = new Date();
     const day = today.getDay();
@@ -94,40 +89,22 @@
   }
 
   async function loadRecords() {
-    const debugEl = document.getElementById('debug');
-    debugEl.textContent = "Загрузка данных...";
-
     try {
-      const url = GOOGLE_SCRIPT_URL + "?t=" + Date.now();
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      
-      const data = await response.json();
-      if (!Array.isArray(data)) throw new Error("Не массив");
-
-      records = data;
-      debugEl.textContent = `Записей: ${records.length} | Ключ: ${getNextTuesdayKey()}`;
+      const response = await fetch(GOOGLE_SCRIPT_URL + "?t=" + Date.now());
+      if (!response.ok) throw new Error("Нет ответа");
+      records = await response.json();
       updatePlaces();
-
-    } catch (error) {
-      console.error("Ошибка:", error);
-      document.getElementById('places').textContent = "Ошибка";
-      debugEl.textContent = `Ошибка: ${error.message}`;
+    } catch (e) {
+      document.getElementById('places').textContent = "Ошибка загрузки";
     }
   }
 
   function updatePlaces() {
-    const key = getNextTuesdayKey(); // например "12.11"
-    
-    const count = records.filter(r => {
-      const cell = r["Дата"] || "";
-      // Ищем "12.11" в "Вторник, 12 ноября" или "12.11.2025"
-      return cell.includes(key);
-    }).length;
-
+    const key = getNextTuesdayKey(); // "11.11"
+    const count = records.filter(r => r["Дата"] === key).length;
     const left = MAX_PLACES - count;
-    const placesEl = document.getElementById('places');
 
+    const placesEl = document.getElementById('places');
     placesEl.textContent = left > 0 ? `Осталось ${left} мест` : "Мест нет";
     placesEl.style.background = left > 0 ? '#e8f5e9' : '#ffebee';
     placesEl.style.color = left > 0 ? '#2e7d32' : '#c62828';
@@ -136,25 +113,12 @@
   }
 
   async function sendToTelegram(data) {
-    const text = `
-НОВАЯ ЗАПИСЬ НА ДЗ
-
-Дата: ${data.date}
-Студент: ${data.student}
-Родитель: ${data.parent}
-Группа: ${data.group || "—"}
-Телефон: ${data.phone}
-
-Осталось мест: ${MAX_PLACES - records.filter(r => (r["Дата"] || "").includes(getNextTuesdayKey())).length - 1}
-    `.trim();
-
-    try {
-      await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text, parse_mode: 'HTML' })
-      });
-    } catch (e) {}
+    const text = `НОВАЯ ЗАПИСЬ\n\nДата: ${data.date}\nСтудент: ${data.student}\nРодитель: ${data.parent}\nГруппа: ${data.group || "—"}\nТелефон: ${data.phone}\n\nОсталось: ${MAX_PLACES - records.filter(r => r["Дата"] === getNextTuesdayKey()).length - 1}`;
+    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text })
+    });
   }
 
   document.getElementById('signup-form').addEventListener('submit', async function(e) {
@@ -164,7 +128,6 @@
 
     const btn = document.getElementById('submit-btn');
     btn.textContent = "Отправка...";
-    btn.disabled = true;
 
     const displayDate = formatDisplayDate();
     const key = getNextTuesdayKey();
@@ -180,15 +143,13 @@
       return;
     }
 
-    const currentCount = records.filter(r => (r["Дата"] || "").includes(key)).length;
-    if (currentCount >= MAX_PLACES) {
+    if (records.filter(r => r["Дата"] === key).length >= MAX_PLACES) {
       alert('Места закончились!');
       btn.textContent = "Записаться";
       isSubmitting = false;
       return;
     }
 
-    // Отправляем в таблицу
     await fetch(GOOGLE_SCRIPT_URL, {
       method: 'POST',
       body: JSON.stringify({ date: displayDate, student, parent, group, phone })
@@ -196,10 +157,7 @@
 
     await sendToTelegram({ date: displayDate, student, parent, group, phone });
 
-    document.getElementById('success-msg').innerHTML = `
-      Вы успешно записались!<br>
-      Ждём вас <strong>${displayDate}</strong> в 18:00.
-    `;
+    document.getElementById('success-msg').innerHTML = `Вы записаны на <strong>${displayDate}</strong> в 18:00!`;
     document.getElementById('success-msg').classList.add('show');
     document.getElementById('signup-form').style.display = 'none';
     document.querySelector('.places').style.display = 'none';
@@ -208,12 +166,10 @@
     isSubmitting = false;
   });
 
-  // Запуск
   (async () => {
     await loadRecords();
-    setInterval(loadRecords, 7000);
+    setInterval(loadRecords, 10000);
   })();
 </script>
-
 </body>
 </html>
